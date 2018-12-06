@@ -1,0 +1,312 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <title>socket</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="http://cdn.amazeui.org/amazeui/2.7.2/css/amazeui.min.css" rel="stylesheet">
+    <style>
+      .nums{ padding:20px; text-align: center; font-size:30px;}
+      .nums b{color:red;}
+      .btnbox{ text-align: center; margin-top:30px;}
+      .inpbox{ width:50%; margin:20px auto;}
+      .battle{ display: flex; align-items: center; padding:20px;}
+      .user{  align-items: center; position: relative; height:50px; }
+      .progress{ display: block; height: 20px; margin-top:15px; position: relative; background: #F37B1D; opacity: 0.7; flex-grow: 1; border-radius:20px; margin-left:40px;}
+      .name{ border-radius: 50%; position: absolute; z-index: 2; background: #F37B1D; color:#fff; height: 50px; line-height: 50px; display: inline-block; min-width:50px; text-align: center;}
+      .user2{ flex-grow: 1;}
+      .user2 .progress{ margin-left:auto; margin-right:15px; background: #3bb4f2; }
+      .user2 .name{right:0; top:0;background: #3bb4f2; }
+      #myName::after{ position: absolute; width:6px; height: 6px; background: #F37B1D; border-radius: 4px 4px 0 0 ; left:50%; margin-left:-3px; top:-5px; display: block; content: "";}
+      .topic{ margin-top:20px;}
+      .topic_title{ position: relative; color:#333; padding:0 0 0 46px; min-height: 60px; font-size:18px; padding-bottom:10px; line-height: 150%;}
+    .topic_options{ max-width: 500px; margin:0 auto; padding-top: 20px;}
+    .topic_options li{box-sizing: border-box; background-color: #f1cc58; color:#7b3011; font-size:16px; text-align: center; margin:10px 8% 0; line-height: 20px; padding:8px 4px; border-radius: 16px; border:2px solid #7b3011; list-style: none}
+    .topic_options li:active{background: #d6ac2a}
+    .topic_options li.right{ background: #b5f643; color:#4f6a21; border-color:#4f6a21;}
+    .topic_options li.wrong{ background: #887027; color:#e2cc87; border-color:#584713;}
+    .lastTime{ position: absolute; right:10px; bottom:10px;}
+    #gamePage{ min-height: 100vh; position: relative; padding:0; overflow: hidden;}
+      .winner{ text-align: center; margin-top:100px; position: relative;}
+      .winner .name{ position: relative; height: 150px; line-height: 150px; width: 150px; font-size:40px;}
+      .winner .name::after{ position: absolute; width:16px; height: 16px; background: #F37B1D; border-radius: 0 0 ; left:50%; margin-left:-8px; top:-15px; display: block; content: "";}
+      .winner .name::before{ position: absolute; width:50px; height: 6px; background: #F37B1D; border-radius: 4px 4px ; left:50%; margin-left:-25px; top:-20px; display: block; content: "";}
+      .loser{text-align: center; margin-top:100px; position: relative;}
+      .loser .name{ position: relative; height: 70px; line-height:70px; width: 70px;  background:#ccc;font-size:20px;}
+      .overTitle{ padding:20px;}
+    </style>
+</head>
+  <body class="en-doc">
+    <div id="indexPage">
+        <div class="nums">游戏人数：<b id="onlinenums">0</b>人</div>
+        <div class="am-form" id="loginformBox">
+            <div class="inpbox">
+                <div class="am-form-group">
+                    <label for="doc-ipt-email-1">昵称</label>
+                    <input type="text" id="username" autocomplete="off" class="" placeholder="输入昵称">
+                  </div>
+            </div>
+            <div class="btnbox"><button type="button" class="am-btn am-btn-warning" id="beginBtn">开始挑战</button></div>
+        </div>
+        <div class="nums" id="lookingBox" style="display:none;">匹配中...</div>
+    </div>
+    <div id="gamePage" style="display:none">
+      <div class="battle">
+        <div class="user" style="width:50%" id="myProgress">
+          <div class="name" id="myName">12</div>
+          <div class="progress"></div>
+        </div>
+        <div class="user user2">
+          <div class="progress"></div>
+          <div class="name" id="matchName">12</div>
+        </div>
+      </div>
+      <div class="topic">
+          <div class="topic_title">
+              <span id="curIndex">1、</span><span id="topicTitle">白日依山尽</span>
+          </div>
+          <div class="topic_options">
+              <ul id="topicQuestion">
+                  <li class="">黄河入海溜</li>
+                  <li class="">黄河入海溜</li>
+                  <li class="">黄河入海溜</li>
+                  <li class="">黄河入海溜</li>
+              </ul>
+          </div>
+      </div>
+      <div class="lastTime" id="lastTime">50s</div>
+    </div>
+    
+    <div id="gameOver" style="display:none">
+      <div class="overTitle">获胜：<span id="winerName">亮亮</span></div>
+      <div class="winner">
+          <div class="name" id="winerName2">亮亮</div>
+          <div class="score" id="winerScore">1880</div>
+      </div>
+      <div class="loser">
+          <div class="name" id="loserName">亮亮</div>
+          <div class="score" id="loserScore">1880</div>
+      </div>
+      <div class="btnbox"><button type="button" class="am-btn am-btn-secondary" id="retryBtn">再来一次</button></div>
+    </div>
+    
+  </body>
+  <script src="https://cdn.bootcss.com/zepto/1.0rc1/zepto.min.js"></script>
+  <script src="http://cdn.bootcss.com/blueimp-md5/1.1.0/js/md5.min.js"></script>
+  <script src="js/socket.io.js"></script>
+  <script>
+    var curTopindex = 0;//当前答题index
+    var totaltopic = 3;// 题目总个数
+    var topics = [
+      { 
+        title:"白日依山尽",
+        question:{
+          "A":"黄河入海溜",
+          "B":"黄河入海流",
+          "C":"黄河入海楼",
+          "D":"黄河入还流"
+        },
+        answer:"B"
+      },
+      { 
+        title:"1+1=",
+        question:{
+          "A":"11",
+          "B":"2",
+          "C":"3",
+          "D":"1"
+        },
+        answer:"B"
+      },
+      { 
+        title:"春节过年有吃什么的习俗",
+        question:{
+          "A":"饺子",
+          "B":"披萨",
+          "C":"炸鸡",
+          "D":"粽子"
+        },
+        answer:"A"
+      }
+    ]
+
+    var user = {
+      uid:'',
+      name:''
+    };
+    
+
+
+
+    $(function(){
+      var battleInfo = null; //对战信息
+      var socket = io.connect('http://localhost:3000');
+      socket.on('comein', function (data) {
+        $("#onlinenums").html(data.onlinecount);
+        //socket.emit('my other event', { my: 'data' });
+      });
+      //已匹配对手
+      socket.on('ready', function (data) {
+        $("#indexPage").hide();
+        $("#myName").html(user.name);
+        $("#gamePage").show();
+        $("#matchName").html(data.matchname);
+        battleInfo = data;
+        console.log(data)
+        initTopic();
+        //socket.emit('my other event', { my: 'data' });
+      });
+
+      //已匹配对手
+      socket.on('run', function (data) {
+        $("#gamePage").hide();
+        console.log("对手逃走了")
+      });
+      
+      //获取答题结果
+      socket.on('result', function (data) {
+        console.log(data)
+        //{yourscore: 50, matchscore: 0}
+        var allscore = data.yourscore + data.matchscore;
+       
+        $("#myProgress").css({
+          width:Math.floor(data.yourscore/allscore*100)+"%"
+        })
+        
+        
+        if(data.isallover){
+          //所有人都答完题目，切换下一题
+          nextTopic();
+        }
+        if(curTopindex>=totaltopic){
+          if(data.yourscore>=data.matchscore){
+            $("#winerName").html(user.name);
+            $("#loserName").html(data.matchname);
+            $("#winerName2").html(user.name);
+            $("#winerScore").html(data.yourscore);
+            $("#loserScore").html(data.matchscore);
+          }else{
+            $("#winerName").html(data.matchname);
+            $("#loserName").html(user.name);
+            $("#winerName2").html(data.matchname);
+            $("#winerScore").html(data.matchscore);
+            $("#loserScore").html(data.yourscore);
+          }
+        }
+        
+        //socket.emit('my other event', { my: 'data' });
+      });
+
+       $("#beginBtn").click(function(){
+         var name = $("#username").val();
+         if(name!=""){
+          user.uid = md5(name+new Date().getTime());
+          user.name = name;
+
+           socket.emit('playgame', user);
+           $("#loginformBox").hide();
+           $("#lookingBox").show();
+         }else{
+           alert("请输入名字");
+           $("#username").focus();
+         }
+       })
+
+       //再玩一次
+       $("#retryBtn").click(function(){
+          curTopindex=0;
+          initTopic();
+          socket.emit('playgame', user);
+           $("#loginformBox").hide();
+           $("#lookingBox").show();
+           $("#indexPage").show();
+           $("#gameOver").hide();
+       })
+
+       var disableAnswer = true;
+       var roundAllTime = 56; //all
+       var eachTime = 0;
+       
+       //题目点击事件
+       $("#topicQuestion").on("click","li",function(){
+         if(disableAnswer){
+          disableAnswer=false;
+          var selectanswer=$(this).data("v");
+          if(selectanswer==topics[curTopindex].answer){
+              console.log("right");
+              $(this).addClass("right");
+              //tindex:当前题目index
+              //result:是否正确
+              socket.emit('topic', {tindex:curTopindex,totalnum:totaltopic,result:true,roomid:battleInfo.roomid,score:getScore(eachTime)});
+          }else{
+            console.log("wrong");
+            $(this).addClass("wrong");
+            socket.emit('topic', {tindex:curTopindex,totalnum:totaltopic,result:false,roomid:battleInfo.roomid,score:0});
+          }
+          console.log(selectanswer)
+         }
+       })
+       
+       //根据时间算得分
+       function getScore(time){
+         return (roundAllTime-time)*10
+       }
+       var topicTimeOut;
+       //答题倒计时
+       function cutDown(){
+         $("#lastTime").html(roundAllTime-eachTime+"s");
+         topicTimeOut = setTimeout(()=>{
+           eachTime++;
+           if(roundAllTime<eachTime){
+             //时间到
+             nextTopic();
+           }else{
+            cutDown();
+           }
+         },1000)
+       }
+
+       
+       function initTopic(){
+        disableAnswer=true;
+        eachTime=0;
+        if(curTopindex<totaltopic){
+          $("#curIndex").html(curTopindex+1+"/"+totaltopic+"、");
+          var curtopic = topics[curTopindex];
+          $("#topicTitle").html(curtopic.title);
+          var questionstr = "";
+          for(var i in curtopic.question){
+            questionstr +="<li data-v='"+i+"'>"+curtopic.question[i]+"</li>";
+          }
+          $("#topicQuestion").html(questionstr);
+          cutDown();
+        }else{
+          gameOverfn();
+        }
+      }
+
+      //下一题
+      function nextTopic(){
+        curTopindex++;
+        clearTimeout(topicTimeOut);
+        initTopic();
+      }
+
+      //游戏结束
+      function gameOverfn(){
+        $("#gameOver").show();
+        $("#gamePage").hide();
+      }
+    })
+
+
+    
+
+
+    
+    
+  </script>
+</html>
+

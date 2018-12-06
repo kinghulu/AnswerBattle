@@ -1,0 +1,223 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('server:server');
+var http = require('http');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+
+
+
+
+var onlines={};//在线人
+var onlinecount = 0;//在线人数
+var lookingusers = []; //匹配中的用户
+var rooms = {};//在线房间
+var clientIndex = 1; //客户端index
+var io = require('socket.io')(server);
+//var io = require('socket.io')(3008);
+
+var sockets={};//在线人
+
+io.on('connection', function (socket) {
+  socket.emit('comein', { onlinecount: onlinecount });
+
+  //点击开始游戏  
+  socket.on('playgame', function (data) {
+    if(socket.name!=data.uid){
+      onlinecount++;
+      socket.name=data.uid;
+    }
+    onlines[data.uid] = data;
+    console.log(onlines);
+    io.emit('comein', { onlinecount: onlinecount });
+    //加入待匹配队列
+    lookingusers.push(data.uid);
+    sockets[data.uid] = socket;
+    //匹配对手
+      matchRoom();
+  });
+
+    //答题 
+  socket.on('topic', function (data) {
+    //{tindex:curTopindex,result:true,roomid:battleInfo.roomid}   
+    let roomid = data.roomid;
+    let tid = data.tindex;
+    var uid = socket.name;
+    let uinfo = rooms[roomid].user[uid];
+    if(!rooms[roomid].topic.hasOwnProperty(tid)){
+      rooms[roomid].topic[tid] = 0;
+    }
+    rooms[roomid].user[uid].score += data.score;
+    let curanswernum = rooms[roomid].topic[tid];
+    rooms[roomid].topic[tid] = ++curanswernum;
+    let matchid = uinfo.match;
+    let isAllOver = false;
+    if(curanswernum>=2){
+      isAllOver = true;
+    }
+
+    socket.emit('result', { yourscore:rooms[roomid].user[uid].score,matchname:onlines[matchid].name, matchscore:rooms[roomid].user[matchid].score,isallover:isAllOver })
+    sockets[matchid].emit('result', { yourscore:rooms[roomid].user[matchid].score,matchname:onlines[uid].name,matchscore:rooms[roomid].user[uid].score,isallover:isAllOver });
+
+    if(data.tid>=(data.totalnum-1)){
+      //游戏结束，解散房间]
+      leaveroom(roomid)
+    }
+  });
+  function leaveroom(rid){
+    if(rooms.hasOwnProperty(rid)){
+      for(let i in rooms[rid].user){
+        if(sockets.hasOwnProperty(i)){
+          delete sockets[i];
+        }
+      }
+      delete rooms[rid];
+    }
+  }
+  
+  //监听用户退出
+  socket.on('disconnect',function () {
+    //将退出用户在在线列表删除
+    if(onlines.hasOwnProperty(socket.name)){
+        //退出用户信息
+        var obj={uid:socket.name, name:onlines[socket.name].name,rid:socket.rid};
+        if(sockets.hasOwnProperty(socket.name)){
+          //通知对手获胜
+          let matchid = rooms[obj.rid].user[obj.uid].match;
+          if(sockets[matchid]){
+            sockets[matchid].emit('run', {  })
+          }
+          delete sockets[socket.name];
+          leaveroom();
+        }
+        
+        //删除
+        delete onlines[socket.name];
+        onlinecount--;
+        io.emit('comein', { onlinecount: onlinecount });
+        //在线人数-1
+        //广播消息
+        //io.emit('logout',{onlines:onlines,onlinecount:onlinecount,user:obj});
+        console.log(obj.name+"退出游戏");
+    }
+    
+  })
+});
+
+
+//匹配对手
+function matchRoom(){
+  if(lookingusers.length>=2){
+    let roomid = new Date().getTime() + Math.floor(Math.random()*1000);
+    let roomobj = {
+      topic:{},
+      user:{}
+    };
+
+    roomobj.user[lookingusers[0]]={
+      score:0,
+      match:lookingusers[1]
+    }
+    roomobj.user[lookingusers[1]]={
+      score:0,
+      match:lookingusers[0]
+    }
+    console.log(roomobj);
+    rooms[roomid] = roomobj;
+    //删除匹配中的用户
+    lookingusers.splice(0,2);
+    for(let i in rooms[roomid].user){
+      let matchid = rooms[roomid].user[i].match;
+      sockets[i].rid = roomid; //记录房间号
+      sockets[i].emit('ready', { roomid:roomid, match: matchid,matchname:onlines[matchid].name })
+    }
+    
+  }
+}
+
+
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
